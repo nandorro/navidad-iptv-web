@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#07300a">
+<title>Navidad IPTV</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Navidad IPTV">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="bg"></canvas>
+
+<div id="app">
+  <header id="top">
+    <div id="titles"><h1 id="title">Navidad IPTV</h1><div id="tagline"></div></div>
+    <div id="topbtns">
+      <select id="themeSel" aria-label="Tema"></select>
+      <button id="btnCfg" aria-label="Ajustes">⚙</button>
+    </div>
+  </header>
+
+  <main id="main">
+    <section id="playerCol" class="panel">
+      <div id="chname">Elige un canal</div>
+      <div id="videoBox">
+        <video id="video" playsinline webkit-playsinline autoplay></video>
+        <div id="vmsg"></div>
+        <div id="fname"></div>
+        <button id="btnExitFull" aria-label="Salir de pantalla completa">✕</button>
+      </div>
+      <div id="ctl">
+        <button id="bPrev" aria-label="Anterior">⏮</button>
+        <button id="bPlay" aria-label="Pausa">⏯</button>
+        <button id="bNext" aria-label="Siguiente">⏭</button>
+        <button id="bMute" aria-label="Silenciar">🔊</button>
+        <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volumen">
+        <button id="bFull" aria-label="Pantalla completa">⛶</button>
+      </div>
+      <div id="ctl2">
+        <button id="btnAnim" class="tog">⏸ Parar animación</button>
+        <button id="btnGrinch" class="tog">💚 Grinch: quitar decoración</button>
+        <button id="btnYt" class="tog">▶ YouTube</button>
+        <button id="btnFut" class="tog">⚽ Fútbol</button>
+        <button id="btnSpa" class="tog">🇪🇸 Spain</button>
+        <button id="btnBg" class="tog">🖼 Fondo</button>
+      </div>
+      <div id="status"></div>
+    </section>
+
+    <section id="listCol" class="panel">
+      <select id="groupSel" aria-label="Grupo"></select>
+      <input id="search" type="search" placeholder="🔍 Buscar canal…" autocomplete="off">
+      <div id="list"></div>
+      <div id="count"></div>
+    </section>
+  </main>
+</div>
+
+<canvas id="fx"></canvas>
+
+<div id="sheet" hidden>
+  <div id="sheetBox" class="panel">
+    <h2>⚙ Ajustes</h2>
+    <label class="row">🖼️ Imagen de fondo del tema
+      <span class="inl"><input id="bgq" type="text" placeholder="ej. nieve, Belén…"><button id="bgGo">🔎</button></span>
+    </label>
+    <button id="cfgReload" class="wide">🔄 Recargar lista de canales</button>
+    <button id="cfgFile" class="wide">📁 Elegir un archivo M3U del móvil…</button>
+    <input id="m3uFile" type="file" accept="*/*" hidden>
+    <label class="row">🔗 …o pega la dirección (URL) de una lista M3U y pulsa «Cargar»
+      <span class="inl"><input id="m3uUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://…/lista.m3u"><button id="m3uGo">Cargar</button></span>
+    </label>
+    <div class="small">Listas añadidas (se suman a los canales del portal):</div>
+    <div id="srcList" class="small"></div>
+    <label class="row chk"><input type="checkbox" id="cfgClean"> 🧹 Limpiar nombres de películas</label>
+    <button id="cfgFavs" class="wide">★ Restablecer favoritos iniciales</button>
+    <button id="cfgClose" class="wide primary">Cerrar</button>
+    <p class="small">Navidad IPTV · los canales con 🌐 se muestran desde su web oficial.</p>
+  </div>
+</div>
+
+<script src="hls.min.js"></script>
+<script src="decor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
