@@ -333,10 +333,23 @@
   }
   (function () {
     const box = $('videoBox'); let x0 = 0, y0 = 0, t0 = 0, moved = false;
-    box.addEventListener('touchstart', (e) => { const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); moved = false; }, { passive: true });
+    let pinch = false, pd0 = 0, pfired = false;
+    const pdist = (e) => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    box.addEventListener('touchstart', (e) => {
+      const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; t0 = Date.now(); moved = false;
+      if (e.touches.length === 2) { pinch = true; pd0 = pdist(e); pfired = false; }
+    }, { passive: true });
     let v0 = 0, vert = false;
     box.addEventListener('touchstart', () => { v0 = +$('vol').value; vert = false; }, { passive: true });
     box.addEventListener('touchmove', (e) => {
+      if (e.touches.length >= 2) {   // zoom con dos dedos: separar = llenar la pantalla, juntar = pantalla completa normal
+        e.preventDefault();
+        if (!pfired && pd0 > 10 && document.body.classList.contains('full')) {
+          const r = pdist(e) / pd0;
+          if (r > 1.2) { setFill(true); pfired = true; } else if (r < 0.83) { setFill(false); pfired = true; }
+        }
+        return;
+      }
       if (webOpen) return;
       const t = e.touches[0], dx = t.clientX - x0, dy = t.clientY - y0;
       if (!vert && Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx) * 1.3) vert = true;
@@ -348,6 +361,7 @@
       vmsg('🔊 ' + nv + '%'); clearTimeout(vTimer); vTimer = setTimeout(() => vmsg(''), 900);
     }, { passive: false });
     box.addEventListener('touchend', (e) => {
+      if (pinch) { if (e.touches.length === 0) pinch = false; vert = false; return; }
       if (webOpen) return;
       if (vert) { vert = false; return; }
       const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
@@ -377,8 +391,19 @@
     if (kind === 'vol') { const nv = Math.max(0, Math.min(100, +$('vol').value + v)); setVol(nv); if (NATIVE && NATIVE.toast) { try { NATIVE.toast('🔊 ' + nv + '%'); } catch (e) { } } }
     else if (kind === 'zap') zap(v);
   };
+  // zoom de la pantalla completa: «llenar» recorta lo que sobre para ocupar toda la pantalla; «normal» deja la imagen entera
+  function setFill(on) {
+    on = !!on; document.body.classList.toggle('fill', on);
+    if (NATIVE && NATIVE.setWebFill) { try { NATIVE.setWebFill(on); } catch (e) { } }
+    if (document.body.classList.contains('full') && !webOpen) { vmsg(on ? '🔍 Pantalla llena' : '🔍 Normal'); clearTimeout(vTimer); vTimer = setTimeout(() => vmsg(''), 900); }
+    showUi();
+  }
+  window.nvZoom = (on) => { if (document.body.classList.contains('full')) setFill(on); };
+  $('bZoomIn').onclick = () => setFill(true);
+  $('bZoomOut').onclick = () => setFill(false);
   function setFull(on) {
     document.body.classList.toggle('full', on);
+    if (!on) setFill(false);
     perf();
     showUi();
     if (NATIVE && NATIVE.fullscreen) { try { NATIVE.fullscreen(on); } catch (e) { } }   // horizontal + barras ocultas
