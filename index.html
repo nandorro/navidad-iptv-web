@@ -28,8 +28,9 @@
   <main id="main">
     <section id="playerCol" class="panel">
       <div id="chname">Elige un canal</div>
-      <div id="videoBox">
+      <div id="videoBox" tabindex="0" role="button" aria-label="Pantalla: OK para maximizar o controlar la web">
         <video id="video" playsinline webkit-playsinline autoplay></video>
+        <canvas id="portal" tabindex="-1"></canvas>
         <div id="vmsg"></div>
         <div id="fname"></div>
         <button id="btnExitFull" aria-label="Salir de pantalla completa">✕</button>
@@ -49,6 +50,13 @@
         <button id="btnFut" class="tog">⚽ Fútbol</button>
         <button id="btnSpa" class="tog">🇪🇸 Spain</button>
         <button id="btnBg" class="tog">🖼 Fondo</button>
+        <button id="btnNat" class="tog" hidden>🌟 Portal</button>
+        <button id="appNetflix" class="tog app">Netflix</button>
+        <button id="appDisney" class="tog app">Disney+</button>
+        <button id="appHbo" class="tog app">HBO Max</button>
+        <button id="appPrime" class="tog app">Prime Video</button>
+        <button id="appSkype" class="tog app">Skype</button>
+        <button id="appPlex" class="tog app">Plex</button>
       </div>
       <div id="status"></div>
     </section>

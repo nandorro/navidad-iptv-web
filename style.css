@@ -36,6 +36,9 @@ button:active{filter:brightness(1.25)}
 .ch .name{flex:1;min-width:0;padding:12px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ch .fav{flex:none;width:44px;text-align:center;padding:12px 0;font-size:19px;color:rgba(255,255,255,.35)}
 .ch .fav.on{color:#ffd34d}
+.ch .mute,.ch .max{flex:none;width:44px;text-align:center;padding:12px 0;font-size:19px;color:rgba(255,255,255,.7)}
+button:focus-visible,select:focus-visible,input:focus-visible,[tabindex="0"]:focus-visible {outline:3px solid #fff;outline-offset:-2px;box-shadow:0 0 0 5px var(--accent)}
+.ch .name:focus-visible,.ch .fav:focus-visible,.ch .max:focus-visible,.ch .mute:focus-visible{background:rgba(255,255,255,.22);border-radius:8px;color:#fff}
 .ch.cur{background:var(--accent);color:var(--sel)}
 #count{font-size:11px;opacity:.8}
 body.full #app{padding:0}
@@ -51,6 +54,16 @@ body.full #fname{display:block;position:absolute;top:calc(10px + env(safe-area-i
 body.full #ctl,body.full #btnExitFull,body.full #fname{transition:opacity .25s}
 body.full.hide-ui #ctl,body.full.hide-ui #btnExitFull,body.full.hide-ui #fname{opacity:0;pointer-events:none}
 body.full #ctl{padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+body.pip #top,body.pip #listCol,body.pip #chname,body.pip #ctl2,body.pip #status,body.pip #ctl,body.pip #fname,body.pip #btnExitFull,body.pip #sheet{display:none!important}
+body.pip #app{padding:0}
+body.pip #main,body.pip #playerCol{padding:0;border:0;background:#000;border-radius:0}
+body.pip #videoBox{position:fixed;inset:0;z-index:40;aspect-ratio:auto;border-radius:0;width:100vw;height:100vh;max-height:none;max-width:none;margin:0}
+#portal{position:absolute;inset:0;width:100%;height:100%;z-index:4;display:none;cursor:pointer;background:#050824}
+body.full #portal,body.pip #portal{display:none!important}
+.tog[hidden]{display:none}
+#btnNetflix,.app{font-size:12px}
+#appNetflix{background:#e50914;color:#fff}#appDisney{background:#113ccf;color:#fff}#appHbo{background:#5b2d90;color:#fff}
+#appPrime{background:#00a8e1;color:#04222e}#appSkype{background:#00aff0;color:#04222e}#appPlex{background:#e5a00d;color:#1a1200}
 body.bgmode #listCol,body.bgmode #chname,body.bgmode #status{display:none}
 body.bgmode #main{justify-content:center;align-items:center}
 body.bgmode #playerCol{flex:none;width:min(62vw,380px);padding:6px;overflow:visible;background:rgba(0,0,0,.35)}

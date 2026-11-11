@@ -81,7 +81,7 @@
     return out || name;
   }
 
-  let channels = [], current = -1, hls = null, webOpen = false;
+  let channels = [], current = -1, hls = null, webOpen = false, portalOn = false;
   const state = {
     theme: LS.get('nv_theme', 'grinch'), portal: LS.get('nv_portal', 'tv'), favs: null, paused: LS.get('nv_paused', false),
     grinch: LS.get('nv_grinch', false), clean: LS.get('nv_clean', false), group: LS.get('nv_portal', 'tv') === 'tv' ? '__fav__' : '__all__',
@@ -195,9 +195,9 @@
     const frag = document.createDocumentFragment();
     rows.slice(0, 600).forEach(({ i, pos, c }) => {
       const d = document.createElement('div'); d.className = 'ch' + (i === current ? ' cur' : ''); d.dataset.i = i;
-      d.innerHTML = '<div class="name"></div><div class="fav" role="button" aria-label="Favorito"></div>';
-      d.firstChild.textContent = c.name + (c.url.startsWith('web:') ? '  🌐' : '');
-      const f = d.lastChild; f.textContent = '★'; if (pos >= 0) f.classList.add('on');
+      d.innerHTML = '<div class="name" role="button" tabindex="0"></div><div class="fav" role="button" tabindex="0" aria-label="Favorito"></div><div class="max" role="button" tabindex="0" aria-label="Ver en pantalla completa">⛶</div><div class="mute" role="button" tabindex="0" aria-label="Silenciar este canal">' + (muted && i === current ? '🔇' : '🔊') + '</div>';
+      d.children[0].textContent = c.name + (c.url.startsWith('web:') ? '  🌐' : '');
+      const f = d.children[1]; f.textContent = '★'; if (pos >= 0) f.classList.add('on');
       frag.appendChild(d);
     });
     list.appendChild(frag);
@@ -207,7 +207,18 @@
   $('list').addEventListener('click', (e) => {
     const row = e.target.closest('.ch'); if (!row) return;
     const i = +row.dataset.i;
-    if (e.target.classList.contains('fav')) { toggleFav(channels[i]); renderList(); return; }
+    if (e.target.classList.contains('fav')) {
+      toggleFav(channels[i]); renderList();
+      const again = document.querySelector('#list .ch[data-i="' + i + '"] .fav'); if (again) again.focus();   // el mando no pierde la posición
+      return;
+    }
+    if (e.target.classList.contains('mute')) {
+      if (i !== current) play(i);
+      muted = i === current && !muted ? true : !muted; applyMute();
+      const again = document.querySelector('#list .ch[data-i="' + i + '"] .mute'); if (again) again.focus();
+      return;
+    }
+    if (e.target.classList.contains('max')) { play(i); if (!document.body.classList.contains('full')) setFull(true); return; }
     play(i);
   });
   $('groupSel').addEventListener('change', (e) => { state.group = e.target.value; renderList(); });
@@ -222,26 +233,28 @@
     const v = $('video'); try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { }
     if (webOpen && NATIVE) { try { NATIVE.closeWeb(); } catch (e) { } }
     webOpen = false; $('video').style.visibility = 'visible';
+    setTimeout(perf, 0);
   }
 
   function rect() {
     const r = $('videoBox').getBoundingClientRect(), d = window.devicePixelRatio || 1;
     return [Math.round(r.left * d), Math.round(r.top * d), Math.round(r.width * d), Math.round(r.height * d)];
   }
-  function syncWeb() { if (webOpen && NATIVE) { const r = rect(); try { NATIVE.moveWeb(r[0], r[1], r[2], r[3]); } catch (e) { } } }
+  function syncWeb() { if (webOpen && NATIVE) { const r = portalOn ? [0, 0, 1, 1] : rect(); try { NATIVE.moveWeb(r[0], r[1], r[2], r[3]); } catch (e) { } } }
 
   function play(i) {
+    showNativity(false);
     if (i == null || i < 0 || !channels[i]) return;
     const c = channels[i];
     if (i === current && Date.now() - (play.t || 0) < 1200) return;
     play.t = Date.now(); current = i;
-    $('chname').textContent = c.name; $('fname').textContent = c.name; showUi();
+    $('chname').textContent = c.name; $('fname').textContent = c.name; showUi(); setTimeout(perf, 0);
     document.querySelectorAll('.ch.cur').forEach(n => n.classList.remove('cur'));
     const row = document.querySelector(`.ch[data-i="${i}"]`); if (row) row.classList.add('cur');
     stopAll(); vmsg('');
     if (c.url.startsWith('web:')) { openWeb(c); return; }
     if (NATIVE) { try { NATIVE.setHeaders(c.referrer || '', c.ua || ''); } catch (e) { } }
-    const v = $('video'); v.volume = $('vol').value / 100; v.muted = muted;
+    const v = $('video'); v.volume = sysVol ? 1 : $('vol').value / 100; v.muted = muted;
     if (!/\.m3u8?(\?|$)/i.test(c.url) && !/m3u8/i.test(c.url)) { vmsg('⚠ Formato no compatible con el móvil'); status('⚠ «' + c.name + '»: formato no compatible.'); return; }
     status('⏳ Conectando con «' + c.name + '»…'); vmsg('⏳');
     if (window.Hls && Hls.isSupported()) {
@@ -263,7 +276,7 @@
     const url = c.url.slice(4);
     $('video').style.visibility = 'hidden';
     if (NATIVE) {
-      const r = rect(); try { NATIVE.openWeb(url, r[0], r[1], r[2], r[3]); webOpen = true; } catch (e) { webOpen = false; }
+      const r = rect(); try { if (NATIVE.setWebMuted) NATIVE.setWebMuted(muted); NATIVE.openWeb(url, r[0], r[1], r[2], r[3]); webOpen = true; } catch (e) { webOpen = false; }
       status('🌐 «' + c.name + '» se muestra desde su web oficial. Si pide cookies o sesión, acéptalo una vez.');
       vmsg('⏳');
     } else { window.open(url, '_blank'); status('🌐 «' + c.name + '» abierto en el navegador.'); vmsg(''); }
@@ -277,10 +290,34 @@
   let muted = false;
   $('bPrev').onclick = () => zap(-1);
   $('bNext').onclick = () => zap(1);
-  $('bPlay').onclick = () => { const v = $('video'); if (v.paused) v.play().catch(() => { }); else v.pause(); };
-  $('bMute').onclick = () => { muted = !muted; $('video').muted = muted; $('bMute').textContent = muted ? '🔇' : '🔊'; };
-  $('vol').oninput = (e) => { $('video').volume = e.target.value / 100; LS.set('nv_vol', +e.target.value); };
+  $('bPlay').onclick = () => {
+    if (webOpen) { if (NATIVE && NATIVE.webPlayPause) { try { NATIVE.webPlayPause(); } catch (e) { } } return; }   // canal web: play/pausa dentro de su página
+    const v = $('video'); if (v.paused) v.play().catch(() => { }); else v.pause();
+  };
+  // silencio: vale para canales locales (vídeo) y web (la app nativa silencia los <video> de la página)
+  function applyMute() {
+    $('video').muted = muted; $('bMute').textContent = muted ? '🔇' : '🔊';
+    if (NATIVE && NATIVE.setWebMuted) { try { NATIVE.setWebMuted(muted); } catch (e) { } }
+    document.querySelectorAll('#list .ch').forEach(r => { const b = r.querySelector('.mute'); if (b) b.textContent = (muted && +r.dataset.i === current) ? '🔇' : '🔊'; });
+  }
+  $('bMute').onclick = () => { muted = !muted; applyMute(); };
+  // volumen: en la APK se usa el volumen del sistema (vale para canales locales y web); si el equipo lo tiene fijo, el del vídeo/web
+  let sysVol = false;
+  function setVol(n) {
+    n = Math.max(0, Math.min(100, Math.round(n)));
+    $('vol').value = n; LS.set('nv_vol', n);
+    let ok = false;
+    if (NATIVE && NATIVE.setVolume) { try { ok = !!NATIVE.setVolume(n); } catch (e) { ok = false; } }
+    sysVol = ok;
+    $('video').volume = ok ? 1 : n / 100;
+    if (!ok && NATIVE && NATIVE.setWebVolume) { try { NATIVE.setWebVolume(n); } catch (e) { } }
+  }
+  $('vol').oninput = (e) => setVol(+e.target.value);
   $('vol').value = LS.get('nv_vol', 80);
+  if (NATIVE && NATIVE.getVolume) {
+    try { const g = NATIVE.getVolume(); if (g >= 0) { $('vol').value = g; sysVol = true; } } catch (e) { }
+    setInterval(() => { try { if (!sysVol || document.activeElement === $('vol')) return; const g = NATIVE.getVolume(); if (g >= 0 && Math.abs(g - +$('vol').value) > 1) $('vol').value = g; } catch (e) { } }, 1500);   // botones del mando/móvil
+  }
   $('video').addEventListener('playing', () => { vmsg(''); });
   $('video').addEventListener('waiting', () => { if (current >= 0 && !webOpen) vmsg('⏳'); });
 
@@ -297,22 +334,22 @@
     let v0 = 0, vert = false;
     box.addEventListener('touchstart', () => { v0 = +$('vol').value; vert = false; }, { passive: true });
     box.addEventListener('touchmove', (e) => {
-      if (!document.body.classList.contains('full') || webOpen) return;
+      if (webOpen) return;
       const t = e.touches[0], dx = t.clientX - x0, dy = t.clientY - y0;
       if (!vert && Math.abs(dy) > 18 && Math.abs(dy) > Math.abs(dx) * 1.3) vert = true;
       if (!vert) return;
       e.preventDefault();
       const nv = Math.max(0, Math.min(100, Math.round(v0 - dy / (window.innerHeight * 0.7) * 100)));
-      $('vol').value = nv; $('video').volume = nv / 100; LS.set('nv_vol', nv);
-      if (nv > 0 && muted) { muted = false; $('video').muted = false; $('bMute').textContent = '🔊'; }
+      setVol(nv);
+      if (nv > 0 && muted) { muted = false; applyMute(); }
       vmsg('🔊 ' + nv + '%'); clearTimeout(vTimer); vTimer = setTimeout(() => vmsg(''), 900);
     }, { passive: false });
     box.addEventListener('touchend', (e) => {
-      if (!document.body.classList.contains('full') || webOpen) return;
+      if (webOpen) return;
       if (vert) { vert = false; return; }
       const t = e.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
       if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 1.5 && Date.now() - t0 < 700) { zap(dx < 0 ? 1 : -1); showUi(); return; }
-      if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && document.body.classList.contains('full')) {
         if (document.body.classList.contains('hide-ui')) showUi();
         else { document.body.classList.add('hide-ui'); clearTimeout(uiTimer); }
       }
@@ -322,8 +359,24 @@
     $('ctl').addEventListener('click', showUi);
   })();
 
+  function perf() {
+    const pip = document.body.classList.contains('pip');
+    Decor.setPerf(current >= 0 ? 100 : 33, pip || (document.body.classList.contains('full') && !webOpen && current >= 0));
+    if (NATIVE && NATIVE.setPipOk) { try { NATIVE.setPipOk(current >= 0); } catch (e) { } }   // solo se minimiza a ventana pequeña si hay un canal en marcha
+  }
+  // ventana pequeña (imagen en imagen): solo el vídeo
+  window.nvPip = (on) => {
+    document.body.classList.toggle('pip', !!on); perf();
+    requestAnimationFrame(() => requestAnimationFrame(syncWeb)); setTimeout(syncWeb, 300); setTimeout(syncWeb, 800);
+  };
+  // gestos recibidos desde la web nativa del canal (arriba/abajo = volumen, lados = canal)
+  window.nvSwipe = (kind, v) => {
+    if (kind === 'vol') { const nv = Math.max(0, Math.min(100, +$('vol').value + v)); setVol(nv); if (NATIVE && NATIVE.toast) { try { NATIVE.toast('🔊 ' + nv + '%'); } catch (e) { } } }
+    else if (kind === 'zap') zap(v);
+  };
   function setFull(on) {
     document.body.classList.toggle('full', on);
+    perf();
     showUi();
     if (NATIVE && NATIVE.fullscreen) { try { NATIVE.fullscreen(on); } catch (e) { } }   // horizontal + barras ocultas
     requestAnimationFrame(() => requestAnimationFrame(syncWeb)); setTimeout(syncWeb, 350);
@@ -336,9 +389,17 @@
   if (window.ResizeObserver) new ResizeObserver(syncWeb).observe($('videoBox'));
 
   // ------------------------------------------------------------------ temas y botones
+  // Portal de Belén: en ese tema la pantalla del vídeo muestra el nacimiento hasta que se toca o se elige un canal
+  function showNativity(on) {
+    on = !!on && state.theme === 'belen' && !document.body.classList.contains('full');
+    portalOn = on; window.Portal && window.Portal.show(on);
+    $('btnNat').classList.toggle('on', on);
+    requestAnimationFrame(syncWeb);
+  }
   function applyTheme(key) {
     if (!THEMES[key]) key = 'grinch';
     state.theme = key; LS.set('nv_theme', key);
+    $('btnNat').hidden = key !== 'belen'; showNativity(key === 'belen');
     const t = THEMES[key], r = document.documentElement.style;
     r.setProperty('--top', t.top); r.setProperty('--bottom', t.bottom); r.setProperty('--panel', t.panel); r.setProperty('--text', t.text);
     r.setProperty('--accent', t.accent); r.setProperty('--accent2', t.accent2); r.setProperty('--sel', t.sel);
@@ -424,6 +485,27 @@
     requestAnimationFrame(() => requestAnimationFrame(syncWeb)); setTimeout(syncWeb, 350);
   }
   $('btnBg').onclick = () => setBgMode(!document.body.classList.contains('bgmode'));
+  if (window.Portal) { window.Portal.mount($('portal')); showNativity(state.theme === 'belen'); }
+  $('portal').onclick = () => showNativity(false);                                   // tocar el portal -> aparece el canal
+  $('btnNat').onclick = () => showNativity(!portalOn);
+  $('video').addEventListener('click', () => { if (state.theme === 'belen' && !document.body.classList.contains('full') && !portalOn) showNativity(true); });   // tocar el canal -> vuelve el portal
+  // apps de streaming: se abren si están instaladas; si no, ficha de Play Store
+  const APPS = {
+    appNetflix: ['Netflix', 'com.netflix.mediaclient,com.netflix.ninja', 'com.netflix.mediaclient', 'com.netflix.ninja', 'https://www.netflix.com'],
+    appDisney: ['Disney+', 'com.disney.disneyplus', 'com.disney.disneyplus', 'com.disney.disneyplus', 'https://www.disneyplus.com'],
+    appHbo: ['HBO Max', 'com.wbd.stream,com.hbo.hbonow', 'com.wbd.stream', 'com.wbd.stream', 'https://www.max.com'],
+    appPrime: ['Prime Video', 'com.amazon.avod.thirdpartyclient,com.amazon.amazonvideo.livingroom', 'com.amazon.avod.thirdpartyclient', 'com.amazon.amazonvideo.livingroom', 'https://www.primevideo.com'],
+    appSkype: ['Skype', 'com.skype.raider', 'com.skype.raider', 'com.skype.raider', 'https://web.skype.com'],
+    appPlex: ['Plex', 'com.plexapp.android', 'com.plexapp.android', 'com.plexapp.android', 'https://app.plex.tv'],
+  };
+  Object.keys(APPS).forEach(id => {
+    $(id).onclick = () => {
+      const [name, pk, sp, st, web] = APPS[id]; let ok = false;
+      if (!NATIVE) { window.open(web, '_blank'); status('🌐 Abriendo ' + name + '…'); return; }   // iPhone / navegador: su web (o su app si el móvil la enlaza)
+      try { ok = !!(NATIVE && NATIVE.openApps && NATIVE.openApps(pk, sp, st)); } catch (e) { ok = false; }
+      status(ok ? '▶ Abriendo ' + name + '…' : (NATIVE ? '⬇ ' + name + ' no está instalada: te llevo a Google Play para instalarla.' : '⚠ ' + name + ': solo disponible en la app de Android.'));
+    };
+  });
   if (LS.get('nv_bgmode', false)) setBgMode(true);
   $('btnSpa').onclick = () => setPortal(state.portal === 'spain' ? 'tv' : 'spain');
   $('btnYt').onclick = () => {
@@ -506,7 +588,82 @@
   const qs = new URLSearchParams(location.search);
   if (qs.get('theme')) applyTheme(qs.get('theme'));
   if (qs.get('ev')) { const E = window.DecorEvents; E.cur = qs.get('ev'); E.last = E.cur; E.dir = qs.get('dir') === '-1' ? -1 : 1; E.param = .4; E.t0 = performance.now() / 1000 - (+qs.get('at') || 1) + 2.5; }
-  window.__nv = { play, channels: () => channels, state, Decor };   // para depurar
+  // ------------------------------------------------------------------ mando de Android TV (cruceta + OK)
+  (function () {
+    const SEL = 'button,select,input:not([type=hidden]):not([hidden]),[tabindex="0"]';
+    function cands() {
+      const sheetOpen = !$('sheet').hidden, root = sheetOpen ? $('sheet') : document;
+      return Array.from(root.querySelectorAll(SEL)).filter(el => {
+        if (el.disabled || el.closest('[hidden]')) return false;
+        const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return false;
+        const cs = getComputedStyle(el); return cs.visibility !== 'hidden' && cs.display !== 'none' && cs.opacity !== '0';
+      });
+    }
+    function move(dir) {
+      const list = cands(); if (!list.length) return false;
+      let cur = document.activeElement; if (!cur || !list.includes(cur)) { list[0].focus(); return true; }
+      const a = cur.getBoundingClientRect(), ax = a.left + a.width / 2, ay = a.top + a.height / 2;
+      let best = null, bs = 1e12;
+      for (const el of list) {
+        if (el === cur) continue;
+        const b = el.getBoundingClientRect(), bx = b.left + b.width / 2, by = b.top + b.height / 2;
+        let p, s;
+        if (dir === 'ArrowDown') { if (b.top + 2 < a.bottom - a.height * .5 && by <= ay) continue; p = by - ay; s = Math.abs(bx - ax); if (p <= 1) continue; }
+        else if (dir === 'ArrowUp') { p = ay - by; s = Math.abs(bx - ax); if (p <= 1) continue; }
+        else if (dir === 'ArrowRight') { p = bx - ax; s = Math.abs(by - ay); if (p <= 1) continue; }
+        else { p = ax - bx; s = Math.abs(by - ay); if (p <= 1) continue; }
+        const vertical = dir === 'ArrowDown' || dir === 'ArrowUp';
+        // en la misma fila/columna manda la cercanía; el desvío lateral pesa más
+        const score = p + s * (vertical ? 2.5 : 4) + (s > (vertical ? b.width : b.height) ? 400 : 0);
+        if (score < bs) { bs = score; best = el; }
+      }
+      if (best) { best.focus(); return true; }
+      return false;
+    }
+    document.addEventListener('keydown', (e) => {
+      const k = e.key, full = document.body.classList.contains('full') && !webOpen;
+      const arrows = k === 'ArrowUp' || k === 'ArrowDown' || k === 'ArrowLeft' || k === 'ArrowRight';
+      if (full && ($('sheet').hidden)) {
+        if (arrows || k === 'Enter') {
+          const hidden = document.body.classList.contains('hide-ui');
+          if (k === 'Enter' && hidden) { showUi(); e.preventDefault(); return; }
+          if (k === 'ArrowLeft' || k === 'ArrowRight') { zap(k === 'ArrowRight' ? 1 : -1); showUi(); e.preventDefault(); return; }
+          if (k === 'ArrowUp' || k === 'ArrowDown') {
+            const nv = Math.max(0, Math.min(100, +$('vol').value + (k === 'ArrowUp' ? 8 : -8)));
+            setVol(nv); vmsg('🔊 ' + nv + '%'); clearTimeout(vTimer); vTimer = setTimeout(() => vmsg(''), 900); showUi(); e.preventDefault(); return;
+          }
+        }
+        showUi();
+      }
+      const el = document.activeElement, tag = el && el.tagName;
+      if (arrows) {
+        if (tag === 'INPUT' && (el.type === 'text' || el.type === 'search' || el.type === 'url') && (k === 'ArrowLeft' || k === 'ArrowRight')) return;   // cursor del texto
+        if (tag === 'INPUT' && el.type === 'range' && (k === 'ArrowLeft' || k === 'ArrowRight')) return;                                            // barra de volumen
+        if (move(k)) e.preventDefault();
+      } else if ((k === 'Enter' || k === ' ') && el && el.getAttribute && el.getAttribute('role') === 'button') { el.click(); e.preventDefault(); }
+    }, true);
+    // al abrir la app el foco empieza en el primer botón para que el mando funcione enseguida
+    // la pantalla del vídeo es enfocable: OK = maximizar (emisión local) o pasar el mando a la web del canal
+    $('videoBox').addEventListener('focus', () => { if (webOpen) status('🌐 Pulsa OK para manejar la web con el mando (Atrás devuelve el control a la app).'); else status('⛶ Pulsa OK para maximizar.'); });
+    $('videoBox').addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault(); e.stopPropagation();
+      if (portalOn) { showNativity(false); return; }
+      if (webOpen && NATIVE && NATIVE.focusWeb) { try { NATIVE.focusWeb(); } catch (x) { } }
+      else if (!webOpen) setFull(!document.body.classList.contains('full'));
+    });
+    // el foco empieza directamente en el primer canal (para buscar hay que subir al cuadro de búsqueda y pulsar OK)
+    let tries = 0;
+    (function focusFirst() {
+      const a = document.activeElement;
+      if (a && a !== document.body && a.closest && a.closest('#list')) return;
+      if (tries > 0 && a && a !== document.body && !a.closest('#list')) return;   // el usuario ya se ha movido
+      const f = document.querySelector('#list .ch .name');
+      if (f) f.focus(); else if (tries++ < 24) setTimeout(focusFirst, 500);
+    })();
+  })();
+
+  window.__nv = { showNativity, play, channels: () => channels, state, Decor };   // para depurar
 })();
 
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && !window.NativeApi && !window.Capacitor) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }

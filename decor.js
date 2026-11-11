@@ -858,6 +858,7 @@
       const pool = POOLS[this.theme]; let kinds = Object.keys(pool).filter(k => k !== this.last); if (!kinds.length) kinds = Object.keys(pool);
       if (!kind) { const tot = kinds.reduce((a, k) => a + pool[k], 0); let r = Math.random() * tot; for (const k of kinds) { r -= pool[k]; if (r <= 0) { kind = k; break; } } kind = kind || kinds[0]; }
       this.cur = this.last = kind; this.t0 = performance.now() / 1000; this.dir = Math.random() < .5 ? 1 : -1; this.param = Math.random();
+      if (kind === 'kings' && window.Portal) window.Portal.startVisit();
     },
     update() {
       const now = performance.now() / 1000;
@@ -870,7 +871,7 @@
       const t = performance.now() / 1000 - this.t0, dur = DUR[this.cur], prog = Math.max(0, Math.min(1, t / dur)), k = this.cur, d = this.dir;
       c.save();
       if (k === 'santa') drawSanta(c, prog, w, h, d, S); else if (k === 'star') drawStar(c, prog, w, h, d, S);
-      else if (k === 'kings') drawKings(c, prog, w, h, d, S); else if (k === 'gizmo') drawGizmo(c, prog, w, h, d, S, dur);
+      else if (k === 'kings') { if (!(window.Portal && window.Portal.on)) drawKings(c, prog, w, h, d, S); } else if (k === 'gizmo') drawGizmo(c, prog, w, h, d, S, dur);
       else if (k === 'chase') drawChase(c, prog, w, h, d, S, dur); else if (k === 'kiss') drawKiss(c, prog, w, h, d, S, dur);
       else if (k === 'vampire') drawVampire(c, prog, w, h, d, S); else if (k === 'zombies') drawZombies(c, prog, w, h, d, S);
       else if (k === 'bats') drawBats(c, prog, w, h, d, S); else if (k === 'ghost') drawGhost(c, prog, w, h, d, S); else if (k === 'ball') drawBall(c, prog, w, h, d, S);
@@ -995,15 +996,16 @@
   // ------------------------------------------------------------------ motor
   const Decor = {
     paused: false, grinch: false, key: 'grinch', theme: null, bgImg: null,
-    tick: 0, parts: [], _static: null, _sKey: '', _fx: null, _fKey: '', _fxTick: -99, W: 0, H: 0, dpr: 1, S: 1, last: 0,
+    tick: 0, parts: [], _static: null, _sKey: '', _fx: null, _fKey: '', _fxTick: -99, W: 0, H: 0, dpr: 1, S: 1, last: 0, minDt: 33, skip: false,
     init(bg, fx) {
       this.bg = bg; this.fx = fx; this.bc = bg.getContext('2d'); this.fc = fx.getContext('2d');
       window.addEventListener('resize', () => this.resize()); this.resize();
-      const loop = (ts) => { requestAnimationFrame(loop); if (ts - this.last < 33) return; this.last = ts; this.frame(); };
+      const loop = (ts) => { requestAnimationFrame(loop); if (this.skip || ts - this.last < this.minDt) return; this.last = ts; this.frame(); };
       requestAnimationFrame(loop);
     },
     resize() {
-      this.dpr = Math.min(window.devicePixelRatio || 1, 2); this.W = window.innerWidth; this.H = window.innerHeight;
+      this.W = window.innerWidth; this.H = window.innerHeight;
+      this.dpr = Math.max(.75, Math.min(window.devicePixelRatio || 1, 1.5, Math.sqrt(1.5e6 / (this.W * this.H))));   // pantallas grandes (TV): menos píxeles = vídeo fluido
       this.S = Math.max(.5, Math.min(1, this.W / 900));
       [this.bg, this.fx].forEach(cv => { cv.width = this.W * this.dpr; cv.height = this.H * this.dpr; cv.style.width = this.W + 'px'; cv.style.height = this.H + 'px'; });
       this._sKey = ''; this._fKey = '';
@@ -1014,6 +1016,11 @@
       this._sKey = ''; this._fKey = '';
     },
     setBgImage(img) { this.bgImg = img; this._sKey = ''; },
+    // rendimiento: con un canal en marcha la decoración va a menos fps; en pantalla completa local se detiene
+    setPerf(minDt, skip) {
+      this.minDt = minDt; this.skip = !!skip;
+      this.fx.style.display = skip ? 'none' : ''; this.bg.style.display = skip ? 'none' : '';
+    },
     setPaused(on) { this.paused = on; Events.clear(); this.clearFx(); },
     setGrinch(on) { this.grinch = on; Events.clear(); this.clearFx(); this._fKey = ''; },
     trigger() { if (!this.paused && !this.grinch) Events.trigger(); },
@@ -1062,6 +1069,109 @@
       if (Events.cur) Events.paint(f, w, h, this.S);
     },
   };
+  // ------------------------------------------------------------------ Portal de Belén (escena del nacimiento) + visita de los Reyes
+  const SKIN = '#f6c9a0';
+  const sm = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
+  const lerp = (a, b, f) => a + (b - a) * f;
+  function ofrenda(c, kind, x, y, t) {
+    if (kind === 0) {   // oro
+      rect(c, x - 8, y - 6, 16, 10, '#d4a017', '#7a5a00', 1); rect(c, x - 8, y - 9, 16, 4, '#f0c23a', '#7a5a00', 1);
+      [[-4, -11], [2, -12], [6, -10]].forEach(([dx, dy]) => ell(c, x + dx, y + dy, 2.6, 2.6, '#ffd34d', '#8a6a00', .6)); glow(c, x, y - 6, 14, '#ffe27a', 110);
+    } else if (kind === 1) {   // incienso
+      ell(c, x, y - 1, 7, 4.5, '#c9a227', '#7a5a00', 1); rect(c, x - 3, y + 2, 6, 2, '#8a6a10');
+      for (let i = 0; i < 4; i++) { const f = ((t * .6 + i / 4) % 1); c.globalAlpha = .55 * (1 - f); ell(c, x + Math.sin(f * 7 + i) * 3, y - 6 - f * 20, 2 + f * 3.5, 2 + f * 3.5, '#f2f2f2'); }
+      c.globalAlpha = 1;
+    } else {   // mirra
+      poly(c, [[x - 3.5, y - 11], [x + 3.5, y - 11], [x + 7, y + 3], [x - 7, y + 3]], '#8b2f5f', '#4a1030', 1); rect(c, x - 3, y - 14, 6, 4, '#ffd34d', '#8a6a00', .8); glow(c, x, y - 4, 12, '#ffb0d8', 60);
+    }
+  }
+  function portalScene(c, W, H, t, vp) {
+    const s = Math.min(W / 480, H / 270);
+    const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#050824'); g.addColorStop(.62, '#27337f'); g.addColorStop(1, '#3a2c5a');
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.save(); c.translate((W - 480 * s) / 2, (H - 270 * s) / 2); c.scale(s, s);
+    for (let i = 0; i < 46; i++) { c.globalAlpha = .3 + .55 * (.5 + .5 * Math.sin(t * 2 + i * 1.7)); ell(c, (i * 97) % 480, (i * 53) % 150 + 4, 1.1, 1.1, '#fff'); }
+    c.globalAlpha = 1;
+    // estrella de Belén y su haz de luz
+    const pulse = .85 + .15 * Math.sin(t * 3);
+    const bg = c.createLinearGradient(0, 40, 0, 205); bg.addColorStop(0, 'rgba(255,226,122,.34)'); bg.addColorStop(1, 'rgba(255,226,122,0)');
+    poly(c, [[240, 42], [175, 205], [305, 205]], bg);
+    glow(c, 240, 34, 56 * pulse, '#ffe27a', 190);
+    c.save(); c.translate(240, 34); c.rotate(Math.sin(t) * 5 * D2R); star(c, 0, 0, 26 * pulse, '#fff1a8', 8, .28); star(c, 0, 0, 13, '#fff', 4, .25); c.restore();
+    // colinas y suelo
+    hills(c, 480, 270, '#1b1c4a', 85, 14, 160, .5);
+    rect(c, -600, 205, 1700, 200, '#3b2a1a'); rect(c, -600, 205, 1700, 6, '#2d4a22');
+    // establo
+    rect(c, 118, 96, 244, 112, '#2a1608'); glow(c, 240, 190, 130, '#ffb347', 100);
+    // buey (detrás, a la izquierda) y mula (detrás, a la derecha)
+    const hb = Math.sin(t * 1.3) * 1.6;
+    [-24, -12, 12, 24].forEach((dx) => line(c, 165 + dx, 184, 165 + dx, 205, '#6a4424', 5));
+    ell(c, 165, 176, 36, 19, '#8a5a32'); line(c, 200, 170, 211, 186, '#6a4424', 3);
+    ell(c, 134, 166 + hb, 14, 12, '#8a5a32'); poly(c, [[127, 158 + hb], [118, 148 + hb], [124, 160 + hb]], '#f2e6c8'); poly(c, [[141, 158 + hb], [150, 148 + hb], [143, 161 + hb]], '#f2e6c8');
+    ell(c, 126, 171 + hb, 8, 6, '#caa27a'); ell(c, 131, 163 + hb, 1.8, 1.8, '#111'); ell(c, 147, 163 + hb, 6, 3.4, '#6a4424', null, 0, -25);
+    [-22, -10, 10, 22].forEach((dx) => line(c, 318 + dx, 184, 318 + dx, 205, '#55555e', 4.5));
+    ell(c, 318, 177, 32, 16, '#7d7d86'); line(c, 348, 172, 358, 192, '#55555e', 3);
+    ell(c, 346, 166 - hb, 12, 10, '#7d7d86'); poly(c, [[340, 158 - hb], [336, 140 - hb], [345, 156 - hb]], '#7d7d86'); poly(c, [[349, 158 - hb], [354, 141 - hb], [353, 158 - hb]], '#7d7d86');
+    ell(c, 354, 172 - hb, 7, 5.5, '#9a9aa3'); ell(c, 348, 163 - hb, 1.7, 1.7, '#111'); line(c, 336, 160 - hb, 330, 176, '#4a4a52', 3);
+    // postes y tejado de paja
+    rect(c, 110, 98, 9, 110, '#5a3a1c'); rect(c, 361, 98, 9, 110, '#5a3a1c');
+    poly(c, [[96, 100], [240, 50], [384, 100], [376, 108], [240, 64], [104, 108]], '#8a6a30', '#5a4218', 1.4);
+    for (let i = 0; i < 18; i++) { const x = 110 + i * 15; line(c, x, 103 - Math.min(i, 17 - i) * 3, x - 3, 110 - Math.min(i, 17 - i) * 3, '#c9a24a', 1.2); }
+    // pesebre con el Niño
+    line(c, 216, 206, 232, 190, '#5a3a1c', 3); line(c, 264, 206, 248, 190, '#5a3a1c', 3);
+    poly(c, [[210, 197], [270, 197], [262, 176], [218, 176]], '#7a4a22', '#4a2a10', 1.4);
+    ell(c, 240, 177, 25, 6, '#f2d46b'); ell(c, 240, 175, 17, 7, '#fff'); ell(c, 228, 172, 6.5, 6.5, SKIN); line(c, 225, 172, 228, 172.5, '#7a4a2a', .9);
+    glow(c, 240, 174, 34 + 3 * Math.sin(t * 2), '#fff3b0', vp >= 0 ? 190 : 140);
+    // María (arrodillada, a la izquierda) y José (de pie, a la derecha)
+    poly(c, [[170, 206], [210, 206], [206, 166], [184, 166]], '#2a5fc4', '#173a80', 1); poly(c, [[172, 206], [186, 206], [184, 170], [180, 172]], '#fff');
+    ell(c, 196, 156, 8, 8.5, SKIN); poly(c, [[186, 156], [196, 143], [207, 157], [203, 170], [188, 170]], '#fff', '#c8d6f5', .8); poly(c, [[188, 152], [196, 143], [205, 153], [196, 149]], '#2a5fc4');
+    ell(c, 208, 178, 3, 3, SKIN); ell(c, 196, 156, 14, 14, null, 'rgba(255,211,77,.9)', 1.5);
+    poly(c, [[289, 206], [315, 206], [311, 150], [293, 150]], '#7a4a2a', '#4a2a10', 1); poly(c, [[311, 206], [322, 206], [318, 160], [310, 156]], '#c79a52');
+    ell(c, 302, 141, 8, 8.5, SKIN); c.beginPath(); c.ellipse(302, 145, 8, 7, 0, 15 * D2R, 165 * D2R); c.closePath(); c.fillStyle = '#5a3a1a'; c.fill(); ell(c, 302, 133, 9, 4, '#5a3a1a');
+    ell(c, 302, 141, 14, 14, null, 'rgba(255,211,77,.9)', 1.5); line(c, 326, 206, 326, 124, '#6b4423', 3);
+    rect(c, 322, 122, 8, 11, '#ffd86b', '#7a5a2a', 1); glow(c, 326, 128, 22, '#ffcc55', 140);
+    // paja en primer plano
+    for (let i = 0; i < 30; i++) { const x = 90 + (i * 37) % 300, y = 208 + (i * 11) % 8; line(c, x, y, x + 5, y - 2, '#d8b45a', 1.3); }
+    // visita de los Reyes Magos: llegan, se arrodillan y ofrecen oro, incienso y mirra
+    if (vp >= 0) {
+      const fx = [100, 156, 212], fy = 266, k = .62, names = ['Oro', 'Incienso', 'Mirra'];
+      for (let i = 0; i < 3; i++) {
+        let x, flip = 1, kn = 0, walk = 0;
+        if (vp < .28) { x = lerp(-70 - i * 55, fx[i], sm(vp / .28)); walk = 1; }
+        else if (vp < .86) { x = fx[i]; kn = sm((vp - .30) / .08) * (1 - sm((vp - .80) / .06)); }
+        else { x = fx[i] - sm((vp - .86) / .14) * 260; flip = -1; walk = 1; }
+        c.save(); c.translate(x, fy + (walk ? Math.abs(Math.sin(t * 6 + i)) * -2 : 0)); c.scale(flip * k, k); c.rotate(kn * .42 * flip); c.scale(1, 1 - .22 * kn);
+        king(c, i, t * 20, t * 4 + i); c.restore();
+        // ofrenda: sale de las manos del rey y va al pie del pesebre
+        const st = .46 + i * .11, f = sm((vp - st) / .09), gx = lerp(x + 28 * k, 214 + i * 26, f), gy = lerp(fy - 100 * k, 214, f) - Math.sin(Math.PI * f) * 26;
+        if (vp > st - .02 && vp < .86) {
+          ofrenda(c, i, gx, gy, t);
+          if (vp < st + .22) { c.globalAlpha = Math.min(1, (vp - st + .02) * 20) * (1 - sm((vp - st - .12) / .1)); c.font = 'bold 13px system-ui,sans-serif'; c.textAlign = 'center'; c.fillStyle = '#ffe9a8'; c.fillText(names[i], gx, gy - 22); c.globalAlpha = 1; }
+        }
+      }
+    }
+    c.restore();
+  }
+  const Portal = {
+    on: false, visit: -1, raf: 0, last: 0, cv: null,
+    mount(cv) { this.cv = cv; this.cx = cv.getContext('2d'); new ResizeObserver(() => this.resize()).observe(cv.parentElement); this.resize(); },
+    resize() {
+      if (!this.cv) return; const r = this.cv.parentElement.getBoundingClientRect(); const d = Math.min(window.devicePixelRatio || 1, 1.5);
+      this.w = Math.max(2, r.width); this.h = Math.max(2, r.height); this.d = d; this.cv.width = this.w * d; this.cv.height = this.h * d;
+    },
+    show(on) {
+      this.on = !!on; if (!this.cv) return; this.cv.style.display = on ? 'block' : 'none';
+      if (on) { this.resize(); if (!this.raf) { const loop = (ts) => { if (!this.on) { this.raf = 0; return; } this.raf = requestAnimationFrame(loop); if (ts - this.last < 40) return; this.last = ts; this.frame(); }; this.raf = requestAnimationFrame(loop); } }
+    },
+    startVisit() { if (this.on) this.visit = performance.now() / 1000; },
+    frame() {
+      const now = performance.now() / 1000; let vp = -1;
+      if (this.visit >= 0) { vp = (now - this.visit) / DUR.kings; if (vp > 1) { this.visit = -1; vp = -1; } }
+      const c = this.cx; c.setTransform(this.d, 0, 0, this.d, 0, 0); portalScene(c, this.w, this.h, now, vp);
+    },
+  };
+  Portal.scene = portalScene; window.Portal = Portal;
+
   window.Decor = Decor;
   window.DecorEvents = Events;
 })();
