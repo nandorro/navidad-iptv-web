@@ -24,7 +24,7 @@
 
   // ------------------------------------------------------------------ lista de canales
   const PUBLIC_ES = 'https://iptv-org.github.io/iptv/countries/es.m3u';
-  const DEFAULT_FAVS = ['la1', 'la2', 'antena3', 'telemadrid', 'laotra', 'cuatro', 'telecinco', 'lasexta', '24horas', 'trece', 'fdf'];
+  const DEFAULT_FAVS = ['la1', 'la2', 'antena3', 'telemadrid', 'telemadridhd', 'laotra', 'cuatro', 'telecinco', 'lasexta', '24horas', 'trece', 'fdf'];
   const DEAD_URL = ['stmify.com', 'c21livecloud.com', '185.47.212.25', '38.252.238.18', 'digisat.ddns.net', '91.228.35.249'];
   const BC = 'https://players.brightcove.net/6416060453001/2rfYSrHC79_default/index.html?videoId=';
   const WEB = [
@@ -37,7 +37,7 @@
     ['24 Horas', 'https://ztnr.rtve.es/ztnr/1694255.m3u8'], ['Teledeporte', 'https://rtvelivestream.rtve.es/rtvesec/tdp/tdp_main_dvr.m3u8'],
     ['Clan', 'https://lge-lgla2.otteravision.com/lge/lgcla/lgcla.m3u8'], ['Trece', 'https://play.cdn.enetres.net/091DB7AFBD77442B9BA2F141DCC182F5021/live.smil/playlist.m3u8'],
     ['FDF', 'web:https://www.mediasetinfinity.es/directo/fdf/'],
-    ['Telemadrid', 'web:' + BC + '6389770581112'], ['La Otra', 'web:' + BC + '6389770474112'], ['Telemadrid Internacional', 'web:' + BC + '6389768804112'],
+    ['Telemadrid', 'web:' + BC + '6389770581112'], ['Telemadrid HD', 'https://live.telemadrid.cross-media.es/6389770581112/eu-central-1/6416060453001/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJob3N0IjoiajI5YjgyLmVncmVzcy5haGc3NmwiLCJhY2NvdW50X2lkIjoiNjQxNjA2MDQ1MzAwMSIsImVobiI6ImxpdmUudGVsZW1hZHJpZC5jcm9zcy1tZWRpYS5lcyIsImlzcyI6ImJsaXZlLXBsYXliYWNrLXNvdXJjZS1hcGkiLCJzdWIiOiJwYXRobWFwdG9rZW4iLCJhdWQiOlsiNjQxNjA2MDQ1MzAwMSJdLCJqdGkiOiI2Mzg5NzcwNTgxMTEyIn0.kqriAMUkHT6m0V6wkCHJum_EUyL4PAi1zJMKlfmYHEU/playlist-hls.m3u8'], ['La Otra', 'web:' + BC + '6389770474112'], ['Telemadrid Internacional', 'web:' + BC + '6389768804112'],
     ['Neox', 'web:https://www.atresplayer.com/directos/neox/'], ['Nova', 'web:https://www.atresplayer.com/directos/nova/'],
     ['Mega', 'web:https://www.atresplayer.com/directos/mega/'], ['Atreseries', 'web:https://www.atresplayer.com/directos/atreseries/'],
     ['Energy', 'web:https://www.mediasetinfinity.es/directo/energy/'], ['Divinity', 'web:https://www.mediasetinfinity.es/directo/divinity/'],
@@ -47,6 +47,7 @@
 
   function favKey(name) {
     let n = name.toLowerCase().replace(/[\[(].*?[\])]/g, ' ').replace(/[^a-z0-9áéíóúñü]+/g, '');
+    if (n === 'telemadridhd') return n;   // canal propio, distinto de «Telemadrid» (la web)
     return n.replace(/(uhd|fhd|hd|4k|sd)$/, '');
   }
 
@@ -93,7 +94,11 @@
   if (state.portal === 'tv' && !LS.get('nv_favs_laotra', false)) {   // La Otra, tras Telemadrid
     if (!state.favs.includes('laotra')) { const i = state.favs.indexOf('telemadrid'); state.favs.splice(i >= 0 ? i + 1 : state.favs.length, 0, 'laotra'); LS.set(favStore(), state.favs); }
     LS.set('nv_favs_laotra', true);
+  }  if (state.portal === 'tv' && !LS.get('nv_favs_telemadridhd', false)) {   // Telemadrid HD, justo debajo de Telemadrid
+    if (!state.favs.includes('telemadridhd')) { const i = state.favs.indexOf('telemadrid'); state.favs.splice(i >= 0 ? i + 1 : state.favs.length, 0, 'telemadridhd'); LS.set(favStore(), state.favs); }
+    LS.set('nv_favs_telemadridhd', true);
   }
+
 
   // ---- listas propias (archivos o direcciones): se SUMAN a los canales del portal ----
   const memTxt = {};
