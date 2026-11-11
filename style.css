@@ -92,3 +92,4 @@ body.bgmode #ctl2{justify-content:center}
 .srcRow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.12);font-size:13px}
 .srcRow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .srcRow button{padding:4px 10px;font-size:13px}
+button[hidden],.small[hidden]{display:none!important}

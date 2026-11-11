@@ -81,6 +81,9 @@
     <button id="cfgReload" class="wide">🔄 Recargar lista de canales</button>
     <button id="cfgFile" class="wide">📁 Elegir un archivo M3U del móvil…</button>
     <input id="m3uFile" type="file" accept="*/*" hidden>
+    <div class="small" id="fileHint" hidden>📺 Esta tele no tiene explorador de archivos: usa las listas gratuitas o una dirección (URL).</div>
+    <div class="small">📚 Listas gratuitas (un clic):</div>
+    <div id="freeLists" class="inl" style="flex-wrap:wrap;gap:6px"></div>
     <label class="row">🔗 …o pega la dirección (URL) de una lista M3U y pulsa «Cargar»
       <span class="inl"><input id="m3uUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://…/lista.m3u"><button id="m3uGo">Cargar</button></span>
     </label>

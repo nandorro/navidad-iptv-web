@@ -126,6 +126,9 @@
       const extra = pubText ? parseM3U(pubText).filter(c => !DEAD_URL.some(d => c.url.includes(d)) && !mine.has(favKey(c.name))) : [];
       list = NATIONAL.map(c => ({ ...c })).concat(extra.map(c => ({ ...c })));
     }
+    if (state.portal === 'spain' && pubText) {   // Spain: lista gratuita de canales españoles + futbol.m3u
+      parseM3U(pubText).filter(c => !DEAD_URL.some(d => c.url.includes(d))).forEach(c => list.push({ ...c }));
+    }
     if (state.portal !== 'tv' && futText) parseM3U(futText).forEach(c => list.push({ ...c, mine: true, src: 'futbol.m3u' }));
     sources().forEach(src => parseM3U(srcText(src.id)).forEach(c => list.push({ ...c, mine: true, src: src.name })));
     if (state.clean) list.forEach(c => { if (MOVIE_RE.test(c.group)) c.name = cleanMovie(c.name); });
@@ -140,10 +143,10 @@
     let pub = pubCache();
     if (!tv) { try { const r = await fetch('futbol.m3u', { cache: 'no-store' }); futText = r.ok ? await r.text() : ''; } catch (e) { futText = ''; } }
     refreshChannels();
-    if (!tv && !srcs.length && !parseM3U(futText).length) { status((state.portal === 'spain' ? '🇪🇸 Portal Spain' : '⚽ Portal de fútbol') + ': aún sin canales. Carga tu lista M3U en ⚙ Ajustes (o rellena futbol.m3u).'); return; }
+    if (state.portal === 'futbol' && !srcs.length && !parseM3U(futText).length) { status('⚽ Portal de fútbol' + ': aún sin canales. Carga tu lista M3U en ⚙ Ajustes (o rellena futbol.m3u).'); return; }
     if (!force && channels.length) status('⏳ ' + channels.length + ' canales (guardados). Actualizando…');
     const problems = [];
-    if (tv) {
+    if (tv || state.portal === 'spain') {
       try {
         const r = await fetch(PUBLIC_ES, { cache: 'no-store' }); if (!r.ok) throw new Error('HTTP ' + r.status);
         pub = await r.text(); LS.set('nv_m3u_cache', pub.length < 4e6 ? pub : '');
@@ -541,6 +544,21 @@
   }
   function showMine() { state.group = '__mine__'; refreshChannels(); $('groupSel').value = state.group; }
 
+  // listas gratuitas (iptv-org) con un solo botón: sin escribir direcciones con el mando
+  const FREE = [['🇪🇸 España', 'https://iptv-org.github.io/iptv/countries/es.m3u'], ['⚽ Deportes', 'https://iptv-org.github.io/iptv/categories/sports.m3u'],
+    ['📰 Noticias', 'https://iptv-org.github.io/iptv/categories/news.m3u'], ['🎵 Música', 'https://iptv-org.github.io/iptv/categories/music.m3u'],
+    ['🧸 Infantil', 'https://iptv-org.github.io/iptv/categories/kids.m3u'], ['🎬 Cine', 'https://iptv-org.github.io/iptv/categories/movies.m3u']];
+  const fl = $('freeLists');
+  FREE.forEach(([name, url]) => {
+    const b = document.createElement('button'); b.className = 'tog'; b.textContent = name;
+    b.onclick = () => {
+      const l = sources();
+      if (!l.some(x => x.kind === 'url' && x.url === url)) { l.push({ id: newId(), kind: 'url', name: name.replace(/^\S+\s/, '') + ' (gratis)', url }); saveSources(l); }
+      openSheet(false); state.group = '__mine__'; status('⏳ Descargando la lista «' + name + '»…'); loadChannels(true);
+    };
+    fl.appendChild(b);
+  });
+  try { if (NATIVE && NATIVE.isTv && NATIVE.isTv()) { $('cfgFile').hidden = true; $('fileHint').hidden = false; } } catch (e) { }
   $('cfgFile').onclick = () => { $('m3uFile').value = ''; $('m3uFile').click(); };
   $('m3uFile').onchange = (e) => {
     const f = e.target.files && e.target.files[0]; if (!f) return;
